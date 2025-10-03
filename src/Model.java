@@ -66,7 +66,7 @@ public class Model extends JPanel implements ActionListener {
     // Direção solicitada (tecla pressionada)
     private int req_dx, req_dy;
 
-    private int exitRow = -1, exitCol = -1;   // Posição da saída (S)
+    private int exitRow = -1;
     private boolean exitUnlocked = false;     // Se a saída já foi liberada (todas comidas coletadas)
     private int totalFood = 0;                // Quantidade total de comidas no início
     private int foodsLeft = 0;                // Quantas comidas ainda restam
@@ -74,7 +74,6 @@ public class Model extends JPanel implements ActionListener {
 
     // Imagens instanciadas (referências locais)
     private Image up, down, left, right, heart, food;
-    private Timer timer;                      // Timer Swing para repintar e atualizar o jogo
 
     private boolean hungerJustDied = false;   // Usado para exibir mensagem ao morrer por fome (saída antecipada)
     private int frameCounter = 0;             // Contador de frames para debug/memória
@@ -87,7 +86,8 @@ public class Model extends JPanel implements ActionListener {
         addKeyListener(new TAdapter());       // Adiciona controle por teclado
         recalcFoodCount(levelData);           // Conta comidas antes de iniciar
         initGame();                           // Prepara variáveis do jogo
-        timer = new Timer(80, this);          // Intervalo ~12.5 FPS
+        // Timer Swing para repintar e atualizar o jogo
+        Timer timer = new Timer(80, this);          // Intervalo ~12.5 FPS
         timer.start();                        // Inicia ciclo
     }
 
@@ -131,7 +131,7 @@ public class Model extends JPanel implements ActionListener {
                     v |= FOOD_BIT;                 // Comida
                 } else if (ch == 'S') {
                     v |= EXIT_BIT;                 // Saída
-                    exitRow = r; exitCol = c;
+                    exitRow = r; // Posição da saída (S)
                 } else if (ch == 'E') {            // Posição inicial (não é saída)
                     startRow = r; startCol = c;
                 }
@@ -293,9 +293,8 @@ public class Model extends JPanel implements ActionListener {
                 (pacmand_x == 1  && (cell & RIGHT_BIT) != 0) ||
                 (pacmand_y == -1 && (cell & TOP_BIT) != 0) ||
                 (pacmand_y == 1  && (cell & BOTTOM_BIT) != 0)) {
-                if (pacmand_x !=0 || pacmand_y !=0) { // Apenas loga se estava tentando mover
-                    if (DEBUG) System.out.println("[DEBUG] Movimento cancelado (parede)." );
-                }
+                // Apenas loga se estava tentando mover
+                if (DEBUG) System.out.println("[DEBUG] Movimento cancelado (parede)." );
                 pacmand_x = pacmand_y = 0; // Para o movimento
             } else if (targetRow >=0 && targetRow < ROWS && targetCol >=0 && targetCol < COLS) {
                 int tPos = targetRow * COLS + targetCol;
@@ -337,13 +336,11 @@ public class Model extends JPanel implements ActionListener {
         if (lives <= 0) {                // Game over
             inGame = false;
             gameWon = false;
-            pacmand_x = pacmand_y = 0;
-            req_dx = req_dy = 0;
         } else {                         // Reinicia posição
             placePacman();
-            pacmand_x = pacmand_y = 0;
-            req_dx = req_dy = 0;
         }
+        pacmand_x = pacmand_y = 0;
+        req_dx = req_dy = 0;
     }
 
     /** Marca estado de vitória e aplica bônus */
