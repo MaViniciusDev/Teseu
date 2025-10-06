@@ -78,6 +78,9 @@ public class Model extends JPanel implements ActionListener {
     private boolean hungerJustDied = false;   // Usado para exibir mensagem ao morrer por fome (saída antecipada)
     private int frameCounter = 0;             // Contador de frames para debug/memória
 
+    private Agent agent;
+    private boolean aiEnabled = true;
+
     /** Construtor: carrega imagens, inicializa estado e inicia loop do jogo */
     public Model() {
         loadImages();                         // Carrega imagens (uma vez)
@@ -86,6 +89,8 @@ public class Model extends JPanel implements ActionListener {
         addKeyListener(new TAdapter());       // Adiciona controle por teclado
         recalcFoodCount(levelData);           // Conta comidas antes de iniciar
         initGame();                           // Prepara variáveis do jogo
+        this.agent = new Agent(this);
+        if (DEBUG) System.out.println("[Model criado. Dim="+ROWS+"x"+COLS);
         // Timer Swing para repintar e atualizar o jogo
         Timer timer = new Timer(80, this);          // Intervalo ~12.5 FPS
         timer.start();                        // Inicia ciclo
@@ -170,6 +175,9 @@ public class Model extends JPanel implements ActionListener {
         placePacman();                // Define posição inicial
         pacmand_x = pacmand_y = 0;    // Zera movimentação
         req_dx = req_dy = 0;          // Zera direção solicitada
+        if (agent != null) {
+            agent.reset();
+        }
     }
 
     /** Posiciona o Pacman: primeiro tenta 'E', senão escolhe qualquer célula válida */
@@ -197,9 +205,18 @@ public class Model extends JPanel implements ActionListener {
 
     /** Loop de jogo: chamada a cada repaint quando inGame */
     private void playGame(Graphics2D g2d) {
-        if (!gameWon) movePacman();  // Processa lógica de movimento/colisão
-        drawPacman(g2d);             // Desenha o Pacman
-        drawExitStatus(g2d);         // Informações sobre a saída
+        if (aiEnabled && pacman_x % BLOCK_SIZE == 0 && pacman_y % BLOCK_SIZE == 0) {
+            thinkAI();
+        }
+        movePacman();    // Processa lógica de movimento/colisão
+        drawPacman(g2d);               // Desenha o Pacman
+        drawExitStatus(g2d);           // Informações sobre a saída
+    }
+
+    private void thinkAI() {
+        Point nextMove = agent.decideNextMove();
+        req_dx = nextMove.x;
+        req_dy = nextMove.y;
     }
 
     /** Carrega o mapa do arquivo usando a classe Map; fallback se falhar */
@@ -294,7 +311,10 @@ public class Model extends JPanel implements ActionListener {
                 (pacmand_y == -1 && (cell & TOP_BIT) != 0) ||
                 (pacmand_y == 1  && (cell & BOTTOM_BIT) != 0)) {
                 // Apenas loga se estava tentando mover
-                if (DEBUG) System.out.println("[DEBUG] Movimento cancelado (parede)." );
+                if (DEBUG) {
+                    boolean L = (cell & LEFT_BIT) != 0, R = (cell & RIGHT_BIT) != 0, T = (cell & TOP_BIT) != 0, B = (cell & BOTTOM_BIT) != 0;
+                    System.out.println("[DEBUG] Movimento cancelado (parede). cell=("+row+","+col+") dir=("+pacmand_x+","+pacmand_y+") L="+L+" R="+R+" T="+T+" B="+B);
+                }
                 pacmand_x = pacmand_y = 0; // Para o movimento
             } else if (targetRow >=0 && targetRow < ROWS && targetCol >=0 && targetCol < COLS) {
                 int tPos = targetRow * COLS + targetCol;
@@ -468,6 +488,10 @@ public class Model extends JPanel implements ActionListener {
                 else if (k == KeyEvent.VK_RIGHT){ req_dx = 1; req_dy = 0; }
                 else if (k == KeyEvent.VK_UP)   { req_dx = 0; req_dy = -1; }
                 else if (k == KeyEvent.VK_DOWN) { req_dx = 0; req_dy = 1; }
+                else if (k == KeyEvent.VK_A) {
+                    aiEnabled = !aiEnabled;
+                    if (DEBUG) System.out.println("AI " + (aiEnabled ? "ON" : "OFF"));
+                }
                 else if (k == KeyEvent.VK_ESCAPE) inGame = false; // Pausa / sai para intro
             } else if (k == KeyEvent.VK_SPACE) { // Espaço inicia/reinicia
                 inGame = true;
@@ -484,5 +508,89 @@ public class Model extends JPanel implements ActionListener {
         Runtime rt = Runtime.getRuntime();
         long used = (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024);
         System.out.println("[DEBUG] Memória usada: " + used + " MB");
+    }
+
+    // ===================== API PARA AGENTE =====================
+    public int getRows() { return ROWS; }
+    public int getCols() { return COLS; }
+    public int getPacmanRow() { return pacman_y / BLOCK_SIZE; }
+    public int getPacmanCol() { return pacman_x / BLOCK_SIZE; }
+    public boolean isExitUnlocked() { return exitUnlocked; }
+
+    public boolean canMoveBetween(int r, int c, int nr, int nc) {
+        if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) return false;
+        short cell = screenData[r * COLS + c];
+        int dr = nr - r, dc = nc - c;
+        if (dc == -1 && (cell & LEFT_BIT) != 0) return false;
+        if (dc ==  1 && (cell & RIGHT_BIT) != 0) return false;
+        if (dr == -1 && (cell & TOP_BIT) != 0) return false;
+        if (dr ==  1 && (cell & BOTTOM_BIT) != 0) return false;
+        return true;
+    }
+
+    // ===================== SENSOR =====================
+    /**
+     * Retorna uma matriz 3x3 de caracteres representando o sensor do agente.
+     * As 8 posições de borda indicam o conteúdo do labirinto relativo à posição atual
+     * do agente: 'X' (parede ou fora do mapa), 'o' (comida), '_' (corredor vazio),
+     * 'E' (entrada) e 'S' (saída). A posição (2,2) contém a orientação do agente:
+     * 'N' (norte), 'S' (sul), 'L' (leste) ou 'O' (oeste).
+     * Mapeamento (lin/col) relativo ao agente:
+     * (0,0) NW  (0,1) N   (0,2) NE
+     * (1,0) W   (1,1) C   (1,2) E
+     * (2,0) SW  (2,1) S   (2,2) ORIENTAÇÃO
+     */
+    public char[][] getSensor() {
+        char[][] s = new char[3][3];
+        // Posição do agente em coordenadas de célula
+        int row = pacman_y / BLOCK_SIZE;
+        int col = pacman_x / BLOCK_SIZE;
+
+        // Preenche as 8 posições de borda + centro (1,1) com o conteúdo do mapa
+        for (int dr = -1; dr <= 1; dr++) {
+            for (int dc = -1; dc <= 1; dc++) {
+                int rr = row + dr;
+                int cc = col + dc;
+                int i = dr + 1; // 0..2
+                int j = dc + 1; // 0..2
+                if (i == 2 && j == 2) {
+                    // (2,2) será preenchido com a orientação mais abaixo
+                    continue;
+                }
+                s[i][j] = cellCharAt(rr, cc);
+            }
+        }
+        // Centro (1,1) reflete a célula atual
+        s[1][1] = cellCharAt(row, col);
+
+        // Define orientação do agente em (2,2)
+        s[2][2] = orientationChar();
+        return s;
+    }
+
+    /** Converte a célula (r,c) em um caractere de exibição para o sensor. */
+    private char cellCharAt(int r, int c) {
+        // Fora dos limites é tratado como parede 'X'
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return 'X';
+        char raw = map[r][c];
+        if (raw == 'X') return 'X';      // parede sólida
+        if (raw == 'E') return 'E';      // entrada
+        if (raw == 'S') return 'S';      // saída
+        // Caso contrário, aberto: consulta se ainda há comida nesta célula no estado atual
+        short cell = screenData[r * COLS + c];
+        if ((cell & FOOD_BIT) != 0) return 'o';
+        return '_';
+    }
+
+    /** Determina o caractere de orientação do agente. */
+    private char orientationChar() {
+        int dx = req_dx != 0 || req_dy != 0 ? req_dx : pacmand_x;
+        int dy = req_dx != 0 || req_dy != 0 ? req_dy : pacmand_y;
+        if (dx == -1) return 'O'; // Oeste
+        if (dx == 1)  return 'L'; // Leste
+        if (dy == -1) return 'N'; // Norte
+        if (dy == 1)  return 'S'; // Sul
+        // Parado: mantém um padrão (N)
+        return 'N';
     }
 }
