@@ -78,9 +78,7 @@ public class Agent {
         knowledge[row][col] = sensor[1][1];
 
         // Conta comidas coletadas
-        if (knowledge[row][col] == '_' && !visited[row][col]) {
-            // Pode ter coletado comida
-        }
+        // Pode ter coletado comida
     }
 
     private void planPath(int row, int col) {
@@ -151,7 +149,7 @@ public class Agent {
         Point start = new Point(startCol, startRow);
         Point goal = new Point(goalCol, goalRow);
 
-        Node startNode = new Node(start, null, 0, dist(start, goal));
+        Node startNode = new Node(start, 0, dist(start, goal));
         open.add(startNode);
         allNodes.put(start, startNode);
 
@@ -170,14 +168,14 @@ public class Agent {
                 Point np = new Point(nc, nr);
 
                 if (closed.contains(np)) continue;
-                if (!isWalkable(nr, nc)) continue;
+                if (isWalkable(nr, nc)) continue;
                 if (!canMove(cur.pos.y, cur.pos.x, nr, nc)) continue;
 
                 double g = cur.g + 1;
                 Node neighbor = allNodes.get(np);
 
                 if (neighbor == null) {
-                    neighbor = new Node(np, null, Double.MAX_VALUE, Double.MAX_VALUE);
+                    neighbor = new Node(np, Double.MAX_VALUE, Double.MAX_VALUE);
                     allNodes.put(np, neighbor);
                 }
 
@@ -257,7 +255,7 @@ public class Agent {
     }
 
     private boolean isFrontier(int r, int c) {
-        if (!isWalkable(r, c)) return false;
+        if (isWalkable(r, c)) return false;
 
         for (int i = 0; i < 4; i++) {
             int nr = r + DY[i];
@@ -272,11 +270,10 @@ public class Agent {
     }
 
     private boolean isWalkable(int r, int c) {
-        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return false;
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return true;
         char cell = knowledge[r][c];
-        if (cell == '?' || cell == 'X') return false;
-        if (cell == 'S' && !model.isExitUnlocked()) return false;
-        return true;
+        if (cell == '?' || cell == 'X') return true;
+        return cell == 'S' && !model.isExitUnlocked();
     }
 
     private boolean canMove(int r1, int c1, int r2, int c2) {
@@ -284,13 +281,13 @@ public class Agent {
     }
 
     private static class Node implements Comparable<Node> {
-        Point pos;
+        final Point pos;
         Node parent;
         double g, f;
 
-        Node(Point pos, Node parent, double g, double f) {
+        Node(Point pos, double g, double f) {
             this.pos = pos;
-            this.parent = parent;
+            this.parent = null;
             this.g = g;
             this.f = f;
         }

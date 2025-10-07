@@ -78,7 +78,7 @@ public class Model extends JPanel implements ActionListener {
     private boolean hungerJustDied = false;   // Usado para exibir mensagem ao morrer por fome (saída antecipada)
     private int frameCounter = 0;             // Contador de frames para debug/memória
 
-    private Agent agent;
+    private final Agent agent;
     private boolean aiEnabled = true;
 
     /** Construtor: carrega imagens, inicializa estado e inicia loop do jogo */
@@ -524,8 +524,7 @@ public class Model extends JPanel implements ActionListener {
         if (dc == -1 && (cell & LEFT_BIT) != 0) return false;
         if (dc ==  1 && (cell & RIGHT_BIT) != 0) return false;
         if (dr == -1 && (cell & TOP_BIT) != 0) return false;
-        if (dr ==  1 && (cell & BOTTOM_BIT) != 0) return false;
-        return true;
+        return dr != 1 || (cell & BOTTOM_BIT) == 0;
     }
 
     // ===================== SENSOR =====================

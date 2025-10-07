@@ -8,13 +8,33 @@ public class Map {
         try (Scanner scanner = new Scanner(new File(filePath))) {
             java.util.List<char[]> lines = new java.util.ArrayList<>();
             while (scanner.hasNextLine()) {
-                lines.add(scanner.nextLine().toCharArray());
+                String line = scanner.nextLine();
+                // Ignora linhas vazias
+                if (line.trim().isEmpty()) {
+                    continue;
+                }
+                lines.add(line.toCharArray());
             }
+
+            // Valida se o mapa está vazio
+            if (lines.isEmpty()) {
+                System.out.println("Mapa vazio");
+                return null;
+            }
+
+            // Valida se todas as linhas têm o mesmo tamanho
+            int expectedWidth = lines.get(0).length;
+            for (int i = 1; i < lines.size(); i++) {
+                if (lines.get(i).length != expectedWidth) {
+                    System.out.println("Erro: linha " + (i+1) + " tem tamanho diferente. Esperado: " + expectedWidth + ", encontrado: " + lines.get(i).length);
+                    return null;
+                }
+            }
+
             return lines.toArray(new char[lines.size()][]);
         } catch (FileNotFoundException e) {
-            System.out.println("Arquivo não encontrado");
+            System.out.println("Arquivo não encontrado: " + filePath);
             return null;
         }
     }
 }
-
