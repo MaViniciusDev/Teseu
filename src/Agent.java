@@ -86,7 +86,7 @@ public class Agent {
     private void planPath(int row, int col) {
         currentPath.clear();
 
-        // Se já coletou 4 comidas, vai para saída
+        // Se já coletou as comidas, vai para saída
         if (foodsCollected >= TOTAL_FOOD || model.isExitUnlocked()) {
             Point exit = findExit();
             if (exit != null) {
